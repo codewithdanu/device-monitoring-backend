@@ -47,6 +47,7 @@ const io = new Server(httpServer, {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
+  allowEIO3: true,
 });
 
 // Ensure uploads directory exists
