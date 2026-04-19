@@ -2,8 +2,11 @@ const router  = require('express').Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const otplib = require('otplib');
-// Try to find authenticator in possible locations (CJS, ESM wrapper, or direct)
-const authenticator = otplib.authenticator || (otplib.default && otplib.default.authenticator) || otplib;
+// Dynamic detection: Find the object that actually has the 2FA functions
+let authenticator = otplib.authenticator;
+if (!authenticator || typeof authenticator.keyuri !== 'function') {
+  authenticator = (otplib.default && otplib.default.authenticator) || otplib.default || otplib;
+}
 
 const qrcode = require('qrcode');
 const { query } = require('../db');
