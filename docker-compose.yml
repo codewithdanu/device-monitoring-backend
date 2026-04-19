@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: devicedb-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-devicedb}
+      POSTGRES_USER: ${DB_USER:-deviceadmin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-yourpassword}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: device-monitoring-api
+    restart: always
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=${PORT:-3000}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-devicedb}
+      - DB_USER=${DB_USER:-deviceadmin}
+      - DB_PASSWORD=${DB_PASSWORD:-yourpassword}
+      - JWT_SECRET=${JWT_SECRET:-your_super_secret_key}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - UPLOAD_PATH=${UPLOAD_PATH:-./uploads}
+    depends_on:
+      - db
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  pgdata:

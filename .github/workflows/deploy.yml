@@ -1,0 +1,41 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/device-monitoring-backend
+            git checkout production
+            git pull origin production
+            
+            # Create local production env if it doesn't exist
+            if [ ! -f .env.prod ]; then
+              echo "WARNING: .env.prod not found on server. Using existing environmental variables."
+            fi
+
+            # Build and restart containers using production config
+            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Optional: Prune old images to save space
+            docker image prune -f
