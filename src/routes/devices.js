@@ -145,4 +145,23 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
+// PATCH /api/devices/:id — update device (name)
+router.patch('/:id', auth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    const { rows } = await query(
+      `UPDATE devices SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING *`,
+      [name, req.params.id, req.user.userId]
+    );
+
+    if (!rows[0]) return res.status(404).json({ error: 'Device not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('[Devices] Update error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

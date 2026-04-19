@@ -42,6 +42,14 @@ module.exports = (io) => {
         socket.join(`device:${deviceId}`);
         socket.deviceId = deviceId;
 
+        // Join user-specific broadcast room
+        const { rows: [deviceInfo] } = await query('SELECT user_id FROM devices WHERE id = $1', [deviceId]);
+        if (deviceInfo?.user_id) {
+          socket.userId = deviceInfo.user_id;
+          socket.join(`user:${deviceInfo.user_id}:agents`);
+          console.log(`[Socket] Device ${deviceId} joined user room: user:${deviceInfo.user_id}:agents`);
+        }
+
         await query(
           `UPDATE devices SET is_online = TRUE, last_seen = NOW() WHERE id = $1`,
           [deviceId]
