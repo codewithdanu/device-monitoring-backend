@@ -30,10 +30,8 @@ RUN npm install --only=production
 COPY --from=builder /app/src ./src
 
 # Create and use non-root user for security
-RUN addgroup -S nodeapp && adduser -S nodeapp -G nodeapp \
-    && mkdir -p /app/uploads \
-    && chown -R nodeapp:nodeapp /app /app/uploads
-USER nodeapp
+RUN mkdir -p /app/uploads && chown -R node:node /app
+USER node
 
 # Expose port
 EXPOSE 3000
