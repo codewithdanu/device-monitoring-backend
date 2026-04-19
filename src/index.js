@@ -17,7 +17,8 @@ const { query } = require('./db');
 query('UPDATE devices SET is_online = FALSE').catch(err => console.error('[Startup] DB reset failed:', err));
 
 app.use(helmet({
-  contentSecurityPolicy: false, // Set to false if using Swagger/Dashboard on same domain
+  contentSecurityPolicy: false, // Required for Swagger and inline previews
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(compression());
 
