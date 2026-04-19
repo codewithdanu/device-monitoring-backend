@@ -31,7 +31,8 @@ COPY --from=builder /app/src ./src
 
 # Create and use non-root user for security
 RUN addgroup -S nodeapp && adduser -S nodeapp -G nodeapp \
-    && chown -R nodeapp:nodeapp /app
+    && mkdir -p /app/uploads \
+    && chown -R nodeapp:nodeapp /app /app/uploads
 USER nodeapp
 
 # Expose port

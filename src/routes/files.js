@@ -5,7 +5,9 @@ const fs        = require('fs');
 const auth      = require('../middleware/authMiddleware');
 const { query } = require('../db');
 
-const uploadPath = path.resolve(__dirname, '../../uploads');
+const uploadPath = process.env.UPLOAD_PATH 
+  ? path.resolve(process.env.UPLOAD_PATH)
+  : path.resolve(__dirname, '../../uploads');
 
 // Multer disk storage — files saved with timestamp prefix
 const storage = multer.diskStorage({
@@ -13,7 +15,7 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._/]/g, '_');
     cb(null, `${Date.now()}-${safeName}`);
   },
 });
@@ -126,14 +128,21 @@ router.get('/download/:fileId', auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
     if (file.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
-    const filePath = path.resolve(uploadPath, file.stored_name);
+    const filePath = path.join(uploadPath, file.stored_name);
     
     if (!fs.existsSync(filePath)) {
       console.warn(`[Files] Download failed: File not found on disk at ${filePath}`);
       return res.status(404).json({ error: 'Physical file not found on server disk.' });
     }
 
-    res.download(filePath, file.original_name);
+    res.download(filePath, file.original_name, (err) => {
+      if (err) {
+        console.error('[Files] Error during res.download:', err.message);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Download stream failed' });
+        }
+      }
+    });
   } catch (err) {
     console.error('[Files] Download error:', err.stack);
     res.status(500).json({ error: 'Internal server error during download' });
@@ -153,14 +162,21 @@ router.get('/view/:fileId', auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
     if (file.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
-    const filePath = path.resolve(uploadPath, file.stored_name);
+    const filePath = path.join(uploadPath, file.stored_name);
     
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found on disk' });
     }
 
     // sendFile sends it inline, allowing previews
-    res.sendFile(filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('[Files] Error during res.sendFile:', err.message);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to stream file preview' });
+        }
+      }
+    });
   } catch (err) {
     console.error('[Files] View error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
@@ -183,7 +199,7 @@ router.delete('/:fileId', auth, async (req, res) => {
 
     await query(`DELETE FROM shared_files WHERE id = $1`, [req.params.fileId]);
 
-    const filePath = path.resolve(process.env.UPLOAD_PATH || './uploads', file.stored_name);
+    const filePath = path.join(uploadPath, file.stored_name);
     fs.unlink(filePath, (err) => {
       if (err) console.warn('[Files] Could not delete file from disk:', err.message);
     });

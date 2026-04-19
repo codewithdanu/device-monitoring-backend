@@ -50,10 +50,32 @@ const io = new Server(httpServer, {
   allowEIO3: true,
 });
 
-// Ensure uploads directory exists
-const uploadPath = path.resolve(__dirname, '../uploads');
+// Ensure uploads directory exists and is writable
+const uploadPath = process.env.UPLOAD_PATH 
+  ? path.resolve(process.env.UPLOAD_PATH)
+  : path.resolve(__dirname, '../uploads');
+
 if (!fs.existsSync(uploadPath)) {
-  fs.mkdirSync(uploadPath, { recursive: true });
+  try {
+    fs.mkdirSync(uploadPath, { recursive: true });
+    console.log(`[Startup] Created uploads directory at: ${uploadPath}`);
+  } catch (err) {
+    console.error(`[Startup ERROR] Could not create uploads directory: ${err.message}`);
+  }
+}
+
+// Check for write permissions specifically (fixes EACCES issues)
+try {
+  fs.accessSync(uploadPath, fs.constants.W_OK);
+  console.log(`[Startup] Uploads directory is writable: ${uploadPath}`);
+} catch (err) {
+  console.error('****************************************************************');
+  console.error('[Startup CRITICAL] UPLOADS DIRECTORY IS NOT WRITABLE!');
+  console.error(`Path: ${uploadPath}`);
+  console.error(`Error: ${err.message}`);
+  console.error('If running in Docker, ensure host permissions are correct:');
+  console.error('sudo chown -R 1000:1000 ./uploads && sudo chmod -R 775 ./uploads');
+  console.error('****************************************************************');
 }
 
 // Middleware
