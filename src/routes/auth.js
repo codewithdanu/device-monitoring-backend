@@ -1,13 +1,7 @@
 const router  = require('express').Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const otplib = require('otplib');
-// Dynamic detection: Find the object that actually has the 2FA functions
-let authenticator = otplib.authenticator;
-if (!authenticator || typeof authenticator.keyuri !== 'function') {
-  authenticator = (otplib.default && otplib.default.authenticator) || otplib.default || otplib;
-}
-
+const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const { query } = require('../db');
 const { authLimiter } = require('../middleware/rateLimiter');
@@ -167,21 +161,19 @@ router.post('/password/update', authMiddleware, async (req, res) => {
 // 2FA Management (Protected)
 router.post('/2fa/setup', authMiddleware, async (req, res) => {
   try {
-    const secret = authenticator.generateSecret();
-    const username = req.user.username || 'User';
-    const otpauth = authenticator.keyuri(username, 'DeviceControl', secret);
+    const secretObj = speakeasy.generateSecret({ length: 20, name: `DeviceControl (${req.user.username || 'admin'})` });
+    const otpauth = secretObj.otpauth_url;
     const qrImage = await qrcode.toDataURL(otpauth);
     
-    // Temporarily store secret (un-verified)
-    await query('UPDATE users SET two_factor_secret = $1 WHERE id = $2', [secret, req.user.userId]);
+    // Store base32 secret (un-verified)
+    await query('UPDATE users SET two_factor_secret = $1 WHERE id = $2', [secretObj.base32, req.user.userId]);
     
-    res.json({ secret, qrImage });
+    res.json({ secret: secretObj.base32, qrImage });
   } catch (err) {
     console.error('2FA Setup Error:', err);
     res.status(500).json({ 
       error: 'Failed to generate setup',
-      message: err.message,
-      stack: err.stack
+      message: err.message
     });
   }
 });
@@ -192,7 +184,12 @@ router.post('/2fa/verify', authMiddleware, async (req, res) => {
     const { rows } = await query('SELECT two_factor_secret FROM users WHERE id = $1', [req.user.userId]);
     const user = rows[0];
 
-    const isValid = authenticator.verify({ token: code, secret: user.two_factor_secret });
+    const isValid = speakeasy.totp.verify({
+      secret: user.two_factor_secret,
+      encoding: 'base32',
+      token: code,
+      window: 1
+    });
     if (!isValid) return res.status(400).json({ error: 'Invalid verification code' });
 
     const recoveryCodes = generateRecoveryCodes();
@@ -215,7 +212,12 @@ router.post('/2fa/disable', authMiddleware, async (req, res) => {
 
     if (!user.two_factor_enabled) return res.status(400).json({ error: '2FA not enabled' });
 
-    const isValid = authenticator.verify({ token: code, secret: user.two_factor_secret });
+    const isValid = speakeasy.totp.verify({
+      secret: user.two_factor_secret,
+      encoding: 'base32',
+      token: code,
+      window: 1
+    });
     if (!isValid) return res.status(400).json({ error: 'Invalid verification code' });
 
     await query(
