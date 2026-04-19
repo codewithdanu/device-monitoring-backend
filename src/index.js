@@ -76,6 +76,7 @@ app.use('/api/files',    require('./routes/files'));
 app.use('/api/metrics',  require('./routes/metrics'));
 
 app.set('io', io);
+require('./socket/agentHandler')(io);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
