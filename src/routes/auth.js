@@ -99,9 +99,15 @@ router.post('/login/2fa', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Code and tempToken required' });
     }
 
-    const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+    } catch (jwtErr) {
+      return res.status(401).json({ error: 'Session expired. Please login again.' });
+    }
+
     if (!decoded.awaiting2FA) {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ error: 'Invalid token type' });
     }
 
     const { rows } = await query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
@@ -109,9 +115,14 @@ router.post('/login/2fa', authLimiter, async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Verify code or recovery code
-    const isValid = authenticator.verify({ token: code, secret: user.two_factor_secret });
-    const isRecovery = user.recovery_codes.includes(code);
+    // Verify TOTP code using speakeasy
+    const isValid = speakeasy.totp.verify({
+      secret: user.two_factor_secret,
+      encoding: 'base32',
+      token: code,
+      window: 1
+    });
+    const isRecovery = Array.isArray(user.recovery_codes) && user.recovery_codes.includes(code);
 
     if (!isValid && !isRecovery) {
       return res.status(401).json({ error: 'Invalid authentication code' });
@@ -131,7 +142,8 @@ router.post('/login/2fa', authLimiter, async (req, res) => {
 
     res.json({ token, userId: user.id, username: user.username });
   } catch (err) {
-    res.status(401).json({ error: 'Session expired or invalid' });
+    console.error('[2FA Login Error]:', err.message);
+    res.status(500).json({ error: 'Internal server error during 2FA verification' });
   }
 });
 
