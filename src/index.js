@@ -51,7 +51,7 @@ const io = new Server(httpServer, {
 });
 
 // Ensure uploads directory exists
-const uploadPath = process.env.UPLOAD_PATH || './uploads';
+const uploadPath = path.resolve(__dirname, '../uploads');
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
