@@ -162,11 +162,17 @@ router.get('/view/:fileId', auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
     if (file.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
+    const filePath = path.join(uploadPath, file.stored_name);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
+
     // Set MIME type explicitly for better browser handling
     if (file.mime_type) {
       res.setHeader('Content-Type', file.mime_type);
     }
-    
+
     // sendFile sends it inline, allowing previews
     res.sendFile(filePath, (err) => {
       if (err) {
