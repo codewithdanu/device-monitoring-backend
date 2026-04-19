@@ -56,11 +56,27 @@ router.post('/:deviceId', auth, async (req, res) => {
 
     // Emit command to device via Socket.io
     const io = req.app.get('io');
-    io.to(`device:${req.params.deviceId}`).emit('command', {
-      commandId:      cmd.id,
-      command_type,
-      command_params,
-    });
+    
+    if (command_type === 'WAKE_ON_LAN' && !device.is_online) {
+      // Special case: Device is offline, broadcast to all other agents of this user to act as relay
+      console.log(`[Commands] Broadcasting WAKE_ON_LAN relay for device ${req.params.deviceId} to user room`);
+      io.to(`user:${req.user.userId}:agents`).emit('command', {
+        commandId:      cmd.id,
+        command_type:   'WAKE_ON_LAN',
+        command_params: { 
+          ...command_params,
+          is_relay: true,
+          target_device_id: req.params.deviceId
+        },
+      });
+    } else {
+      // Standard direct command
+      io.to(`device:${req.params.deviceId}`).emit('command', {
+        commandId:      cmd.id,
+        command_type,
+        command_params,
+      });
+    }
 
     res.json({
       commandId:  cmd.id,

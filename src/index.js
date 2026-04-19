@@ -16,11 +16,25 @@ const app        = express();
 const { query } = require('./db');
 query('UPDATE devices SET is_online = FALSE').catch(err => console.error('[Startup] DB reset failed:', err));
 
-// Production Middlewares
 app.use(helmet({
   contentSecurityPolicy: false, // Set to false if using Swagger/Dashboard on same domain
 }));
 app.use(compression());
+
+// DIAGNOSTIC LOGGER: Capture all download attempts at entry
+app.use((req, res, next) => {
+  if (req.url.includes('/download/')) {
+    console.log('[Global Debug] REQ Incoming:', {
+      method: req.method,
+      url: req.url,
+      originalUrl: req.originalUrl,
+      query: req.query,
+      timestamp: new Date().toISOString()
+    });
+  }
+  next();
+});
+
 const httpServer = http.createServer(app);
 
 // CORS Configuration
@@ -44,6 +58,7 @@ if (!fs.existsSync(uploadPath)) {
 // Middleware
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
@@ -60,11 +75,16 @@ app.use('/api/commands', require('./routes/commands'));
 app.use('/api/files',    require('./routes/files'));
 app.use('/api/metrics',  require('./routes/metrics'));
 
-// Socket.io agent handler
-require('./socket/agentHandler')(io);
-
-// Make io accessible to routes
 app.set('io', io);
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('[Server Error]', err.stack);
+  const status = err.status || 500;
+  res.status(status).json({
+    error: err.message || 'Internal Server Error',
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () =>
