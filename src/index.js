@@ -23,10 +23,13 @@ app.use(helmet({
 app.use(compression());
 const httpServer = http.createServer(app);
 
+// CORS Configuration
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*';
+
 // Socket.io with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
 });
@@ -38,7 +41,7 @@ if (!fs.existsSync(uploadPath)) {
 }
 
 // Middleware
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 // API Documentation
