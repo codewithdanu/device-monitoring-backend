@@ -24,7 +24,8 @@ app.use(compression());
 const httpServer = http.createServer(app);
 
 // CORS Configuration
-const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*';
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+const allowedOrigins = corsOrigin === '*' ? '*' : corsOrigin.split(',');
 
 // Socket.io with CORS
 const io = new Server(httpServer, {
