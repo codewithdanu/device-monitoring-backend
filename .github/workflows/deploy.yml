@@ -50,14 +50,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Copy docker-compose via SCP
+      - name: Copy deployment files via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.prod.yml,migrations/"
           target: "~/device-monitoring-backend/"
+
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
