@@ -162,7 +162,8 @@ router.post('/password/update', authMiddleware, async (req, res) => {
 router.post('/2fa/setup', authMiddleware, async (req, res) => {
   try {
     const secret = authenticator.generateSecret();
-    const otpauth = authenticator.keyuri(req.user.username, 'DeviceControl', secret);
+    const username = req.user.username || 'User';
+    const otpauth = authenticator.keyuri(username, 'DeviceControl', secret);
     const qrImage = await qrcode.toDataURL(otpauth);
     
     // Temporarily store secret (un-verified)
@@ -170,7 +171,12 @@ router.post('/2fa/setup', authMiddleware, async (req, res) => {
     
     res.json({ secret, qrImage });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate setup' });
+    console.error('2FA Setup Error:', err);
+    res.status(500).json({ 
+      error: 'Failed to generate setup',
+      message: err.message,
+      stack: err.stack
+    });
   }
 });
 
