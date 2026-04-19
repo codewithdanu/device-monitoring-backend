@@ -19,10 +19,12 @@ const { query } = require('../db');
  */
 module.exports = (io) => {
   io.on('connection', (socket) => {
-    console.log(`[Socket] New connection: ${socket.id}`);
+    console.log(`[Socket Debug] Attempting connection: ${socket.id} from ${socket.handshake.address}`);
+    console.log(`[Socket Debug] Handshake Query:`, socket.handshake.query);
 
     // ---- AGENT REGISTRATION ----
     socket.on('agent:register', async ({ deviceId, deviceToken }) => {
+      console.log(`[Socket Debug] agent:register signal received for device: ${deviceId}`);
       try {
         if (!deviceId || !deviceToken) {
           return socket.disconnect();
