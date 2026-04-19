@@ -1,7 +1,8 @@
 const router  = require('express').Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const { authenticator } = require('otplib');
+const otplib = require('otplib');
+const authenticator = otplib.authenticator;
 const qrcode = require('qrcode');
 const { query } = require('../db');
 const { authLimiter } = require('../middleware/rateLimiter');
