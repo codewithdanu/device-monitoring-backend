@@ -66,6 +66,10 @@ if (!fs.existsSync(uploadPath)) {
 
 // Check for write permissions specifically (fixes EACCES issues)
 try {
+  const stats = fs.statSync(uploadPath);
+  console.log(`[Startup] Uploads directory info: UID=${stats.uid}, GID=${stats.gid}, Mode=${stats.mode.toString(8)}`);
+  console.log(`[Startup] Process info: UID=${process.getuid()}, GID=${process.getgid()}`);
+  
   fs.accessSync(uploadPath, fs.constants.W_OK);
   console.log(`[Startup] Uploads directory is writable: ${uploadPath}`);
 } catch (err) {
@@ -73,8 +77,10 @@ try {
   console.error('[Startup CRITICAL] UPLOADS DIRECTORY IS NOT WRITABLE!');
   console.error(`Path: ${uploadPath}`);
   console.error(`Error: ${err.message}`);
-  console.error('If running in Docker, ensure host permissions are correct:');
-  console.error('sudo chown -R 1000:1000 ./uploads && sudo chmod -R 775 ./uploads');
+  console.error('Current Process: UID=' + process.getuid() + ', GID=' + process.getgid());
+  console.error('To fix host permissions, run this on your VPS:');
+  console.error(`sudo chown -R ${process.getuid()}:${process.getgid()} ./uploads`);
+  console.error('sudo chmod -R 775 ./uploads');
   console.error('****************************************************************');
 }
 
