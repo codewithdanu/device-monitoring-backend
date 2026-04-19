@@ -78,6 +78,12 @@ module.exports = (io) => {
           battery_percent,
         } = data;
 
+        // Security check: Ensure device is registered and ID matches
+        if (!socket.deviceId || socket.deviceId !== deviceId) {
+          console.warn(`[Socket] Metrics rejected: Unauthorized device ID ${deviceId}`);
+          return;
+        }
+
         await query(
           `INSERT INTO metrics
              (device_id, cpu_percent, memory_used_mb, memory_total_mb,
@@ -109,6 +115,11 @@ module.exports = (io) => {
     // ---- LOCATION ----
     socket.on('agent:location', async ({ deviceId, latitude, longitude, accuracy_meters }) => {
       try {
+        // Security check
+        if (!socket.deviceId || socket.deviceId !== deviceId) {
+          console.warn(`[Socket] Location rejected: Unauthorized device ID ${deviceId}`);
+          return;
+        }
         await query(
           `INSERT INTO locations (device_id, latitude, longitude, accuracy_meters)
            VALUES ($1, $2, $3, $4)`,
