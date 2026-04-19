@@ -2,7 +2,11 @@ const router  = require('express').Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const otplib = require('otplib');
-const authenticator = otplib.authenticator;
+// Fallback logic to find the authenticator object in various otplib versions/environments
+const authenticator = otplib.authenticator || 
+                     (require('otplib/authenticator') && require('otplib/authenticator').authenticator) || 
+                     require('otplib/authenticator');
+
 const qrcode = require('qrcode');
 const { query } = require('../db');
 const { authLimiter } = require('../middleware/rateLimiter');
