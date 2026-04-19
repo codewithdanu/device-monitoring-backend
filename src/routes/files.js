@@ -5,7 +5,7 @@ const fs        = require('fs');
 const auth      = require('../middleware/authMiddleware');
 const { query } = require('../db');
 
-const uploadPath = path.resolve(process.env.UPLOAD_PATH || './uploads');
+const uploadPath = path.resolve(__dirname, '../../uploads');
 
 // Multer disk storage — files saved with timestamp prefix
 const storage = multer.diskStorage({
@@ -113,7 +113,7 @@ router.get('/:deviceId', auth, async (req, res) => {
   }
 });
 
-// GET /api/files/download/:fileId — download a file
+// GET /api/files/download/:fileId — download a file (attachment)
 router.get('/download/:fileId', auth, async (req, res) => {
   try {
     const { rows: [file] } = await query(
@@ -126,7 +126,7 @@ router.get('/download/:fileId', auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
     if (file.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
 
-    const filePath = path.resolve(process.env.UPLOAD_PATH || './uploads', file.stored_name);
+    const filePath = path.resolve(uploadPath, file.stored_name);
     
     if (!fs.existsSync(filePath)) {
       console.warn(`[Files] Download failed: File not found on disk at ${filePath}`);
@@ -137,6 +137,33 @@ router.get('/download/:fileId', auth, async (req, res) => {
   } catch (err) {
     console.error('[Files] Download error:', err.stack);
     res.status(500).json({ error: 'Internal server error during download' });
+  }
+});
+
+// GET /api/files/view/:fileId — view a file (inline)
+router.get('/view/:fileId', auth, async (req, res) => {
+  try {
+    const { rows: [file] } = await query(
+      `SELECT sf.*, d.user_id FROM shared_files sf
+       JOIN devices d ON d.id = sf.device_id
+       WHERE sf.id = $1`,
+      [req.params.fileId]
+    );
+
+    if (!file) return res.status(404).json({ error: 'File not found' });
+    if (file.user_id !== req.user.userId) return res.status(403).json({ error: 'Forbidden' });
+
+    const filePath = path.resolve(uploadPath, file.stored_name);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
+
+    // sendFile sends it inline, allowing previews
+    res.sendFile(filePath);
+  } catch (err) {
+    console.error('[Files] View error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
