@@ -2,10 +2,8 @@ const router  = require('express').Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const otplib = require('otplib');
-// Fallback logic to find the authenticator object in various otplib versions/environments
-const authenticator = otplib.authenticator || 
-                     (require('otplib/authenticator') && require('otplib/authenticator').authenticator) || 
-                     require('otplib/authenticator');
+// Try to find authenticator in possible locations (CJS, ESM wrapper, or direct)
+const authenticator = otplib.authenticator || (otplib.default && otplib.default.authenticator) || otplib;
 
 const qrcode = require('qrcode');
 const { query } = require('../db');
