@@ -120,12 +120,19 @@ module.exports = (io) => {
           console.warn(`[Socket] Location rejected: Unauthorized device ID ${deviceId}`);
           return;
         }
+
+        if (!latitude || !longitude) {
+          console.warn(`[Socket] Location rejected: missing coordinates from ${deviceId}`);
+          return;
+        }
+
         await query(
           `INSERT INTO locations (device_id, latitude, longitude, accuracy_meters)
            VALUES ($1, $2, $3, $4)`,
-          [deviceId, latitude, longitude, accuracy_meters]
+          [deviceId, latitude, longitude, accuracy_meters || null]
         );
 
+        console.log(`[Socket] Location saved: ${deviceId} → ${latitude}, ${longitude}`);
         io.emit('location:update', { deviceId, latitude, longitude, accuracy_meters });
       } catch (err) {
         console.error('[Socket] Location error:', err.message);
