@@ -91,12 +91,12 @@ module.exports = (io) => {
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             deviceId,
-            cpu_percent || 0,
-            memory_used_mb || 0,
-            memory_total_mb || 0,
-            disk_used_gb || 0,
-            disk_total_gb || 0,
-            battery_percent || 0,
+            cpu_percent,
+            memory_used_mb,
+            memory_total_mb,
+            disk_used_gb,
+            disk_total_gb,
+            battery_percent ?? null,
           ]
         );
 
