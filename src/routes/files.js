@@ -4,6 +4,7 @@ const path      = require('path');
 const fs        = require('fs');
 const auth      = require('../middleware/authMiddleware');
 const { query } = require('../db');
+const mime  = require('mime-types');
 
 const uploadPath = process.env.UPLOAD_PATH 
   ? path.resolve(process.env.UPLOAD_PATH)
@@ -53,7 +54,14 @@ router.post('/upload', async (req, res, next) => {
       if (!device) return res.status(403).json({ error: 'Forbidden: Device does not belong to you' });
     }
 
-    const { originalname, filename, size, mimetype } = req.file;
+    let { originalname, filename, size, mimetype } = req.file;
+
+    // Infer better MIME type if generic
+    if (mimetype === 'application/octet-stream') {
+      const inferred = mime.lookup(originalname);
+      if (inferred) mimetype = inferred;
+    }
+
     const { rows: [file] } = await query(
       `INSERT INTO shared_files (device_id, original_name, stored_name, file_size, mime_type)
        VALUES ($1, $2, $3, $4, $5) RETURNING id, uploaded_at`,
