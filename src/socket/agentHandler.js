@@ -113,7 +113,7 @@ module.exports = (io) => {
     });
 
     // ---- LOCATION ----
-    socket.on('agent:location', async ({ deviceId, latitude, longitude, accuracy_meters }) => {
+    socket.on('agent:location', async ({ deviceId, latitude, longitude, accuracy_meters, recorded_at }) => {
       try {
         // Security check
         if (!socket.deviceId || socket.deviceId !== deviceId) {
@@ -126,14 +126,17 @@ module.exports = (io) => {
           return;
         }
 
+        // Use recorded_at if provided (for offline sync), otherwise use NOW()
+        const timestamp = recorded_at ? new Date(recorded_at) : new Date();
+
         await query(
-          `INSERT INTO locations (device_id, latitude, longitude, accuracy_meters)
-           VALUES ($1, $2, $3, $4)`,
-          [deviceId, latitude, longitude, accuracy_meters || null]
+          `INSERT INTO locations (device_id, latitude, longitude, accuracy_meters, recorded_at)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [deviceId, latitude, longitude, accuracy_meters || null, timestamp]
         );
 
-        console.log(`[Socket] Location saved: ${deviceId} → ${latitude}, ${longitude}`);
-        io.emit('location:update', { deviceId, latitude, longitude, accuracy_meters });
+        console.log(`[Socket] Location saved: ${deviceId} → ${latitude}, ${longitude} (time: ${timestamp.toISOString()})`);
+        io.emit('location:update', { deviceId, latitude, longitude, accuracy_meters, recorded_at: timestamp.toISOString() });
       } catch (err) {
         console.error('[Socket] Location error:', err.message);
       }
