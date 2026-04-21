@@ -136,7 +136,7 @@ module.exports = (io) => {
         );
 
         console.log(`[Socket] Location saved: ${deviceId} → ${latitude}, ${longitude} (time: ${timestamp.toISOString()})`);
-        io.to(`user:${socket.userId}:agents`).emit('location:update', { deviceId, latitude, longitude, accuracy_meters, recorded_at: timestamp.toISOString() });
+        io.emit('location:update', { deviceId, latitude, longitude, accuracy_meters, recorded_at: timestamp.toISOString() });
       } catch (err) {
         console.error('[Socket] Location error:', err.message);
       }
@@ -152,16 +152,14 @@ module.exports = (io) => {
 
         console.log(`[Socket] Activity from ${deviceId}: [${app_name}] ${activity}`);
 
-        // Broadcast to relevant user room
-        if (socket.userId) {
-          io.to(`user:${socket.userId}:agents`).emit('activity:update', {
+        // Broadcast to all dashboard clients
+        io.emit('activity:update', {
              deviceId,
              package_name,
              app_name,
              activity,
              recorded_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
-          });
-        }
+        });
       } catch (err) {
         console.error('[Socket] Activity log error:', err.message);
       }
