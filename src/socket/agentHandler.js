@@ -158,6 +158,28 @@ module.exports = (io) => {
       }
     });
 
+    // ---- DASHBOARD PING ----
+    socket.on('dashboard:ping', async ({ deviceId }) => {
+      console.log(`[Socket] Dashboard requested ping for device: ${deviceId}`);
+      try {
+        // Create a temporary command to track the ping
+        const { rows: [command] } = await query(
+          `INSERT INTO commands (device_id, command_type, status)
+           VALUES ($1, $2, $3) RETURNING id`,
+          [deviceId, 'PING', 'PENDING']
+        );
+
+        // Emit to the device room
+        io.to(`device:${deviceId}`).emit('command', {
+          commandId: command.id,
+          command_type: 'PING',
+          command_params: {}
+        });
+      } catch (err) {
+        console.error('[Socket] Ping error:', err.message);
+      }
+    });
+
     // ---- DISCONNECT ----
     socket.on('disconnect', async () => {
       if (socket.deviceId) {
