@@ -161,10 +161,10 @@ module.exports = (io) => {
           [deviceId, package_name, app_name, activity, recordedAt]
         );
 
-        // Auto-cleanup: Delete activities older than 7 days for this device
+        // Auto-cleanup: Delete activities older than 3 days for this device
         // We run this asynchronously so it doesn't block the current request
         query(
-          `DELETE FROM activities WHERE device_id = $1 AND recorded_at < NOW() - INTERVAL '7 days'`,
+          `DELETE FROM activities WHERE device_id = $1 AND recorded_at < NOW() - INTERVAL '3 days'`,
           [deviceId]
         ).catch(err => console.error('[Socket] Activity cleanup error:', err.message));
 
