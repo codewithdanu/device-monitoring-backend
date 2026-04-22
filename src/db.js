@@ -17,6 +17,26 @@ pool.on('connect', () => console.log('[DB] New client connected to pool'));
 
 const query = (text, params) => pool.query(text, params);
 
+// Auto-migration for activities table
+(async () => {
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS activities (
+        id BIGSERIAL PRIMARY KEY,
+        device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        package_name TEXT NOT NULL,
+        app_name TEXT NOT NULL,
+        activity TEXT NOT NULL,
+        recorded_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_activities_device_time ON activities (device_id, recorded_at DESC);
+    `);
+    console.log('[DB] Auto-migration complete for activities table');
+  } catch (err) {
+    console.error('[DB] Auto-migration error:', err.message);
+  }
+})();
+
 const withTransaction = async (fn) => {
   const client = await pool.connect();
   try {
