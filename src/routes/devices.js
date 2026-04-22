@@ -164,4 +164,46 @@ router.patch('/:id', auth, async (req, res) => {
   }
 });
 
+// GET /api/devices/:id/activities — get paginated activity log
+router.get('/:id/activities', auth, async (req, res) => {
+  try {
+    const { rows: [device] } = await query(
+      `SELECT id FROM devices WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.userId]
+    );
+    if (!device) return res.status(403).json({ error: 'Forbidden' });
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // Get total count
+    const { rows: [countResult] } = await query(
+      `SELECT COUNT(*) FROM activities WHERE device_id = $1`,
+      [req.params.id]
+    );
+    const total = parseInt(countResult.count);
+
+    // Get paginated data
+    const { rows } = await query(
+      `SELECT id, package_name, app_name, activity, recorded_at
+       FROM activities 
+       WHERE device_id = $1 
+       ORDER BY recorded_at DESC 
+       LIMIT $2 OFFSET $3`,
+      [req.params.id, limit, offset]
+    );
+
+    res.json({
+      data: rows,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error('[Devices] Activities error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

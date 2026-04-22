@@ -152,13 +152,29 @@ module.exports = (io) => {
 
         console.log(`[Socket] Activity from ${deviceId}: [${app_name}] ${activity}`);
 
+        const recordedAt = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString();
+
+        // Save to DB
+        await query(
+          `INSERT INTO activities (device_id, package_name, app_name, activity, recorded_at)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [deviceId, package_name, app_name, activity, recordedAt]
+        );
+
+        // Auto-cleanup: Delete activities older than 7 days for this device
+        // We run this asynchronously so it doesn't block the current request
+        query(
+          `DELETE FROM activities WHERE device_id = $1 AND recorded_at < NOW() - INTERVAL '7 days'`,
+          [deviceId]
+        ).catch(err => console.error('[Socket] Activity cleanup error:', err.message));
+
         // Broadcast to all dashboard clients
         io.emit('activity:update', {
              deviceId,
              package_name,
              app_name,
              activity,
-             recorded_at: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
+             recorded_at: recordedAt
         });
       } catch (err) {
         console.error('[Socket] Activity log error:', err.message);
