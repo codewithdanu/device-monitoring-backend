@@ -1,7 +1,8 @@
 -- Migration 003: Traccar Client GPS tracking support
 ALTER TABLE devices
   ADD COLUMN IF NOT EXISTS tracker_device_id TEXT UNIQUE,
-  ADD COLUMN IF NOT EXISTS tracker_last_ping_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS tracker_last_ping_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS tracker_battery_level REAL;
 
 UPDATE devices
 SET tracker_device_id = 'DMS-' || UPPER(SUBSTRING(id::text FROM 1 FOR 8))

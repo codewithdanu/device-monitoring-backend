@@ -79,8 +79,10 @@ router.post('/register', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT id, name, device_type, os, is_online, last_seen, mac_address, created_at,
-              tracker_device_id, tracker_last_ping_at
+      `SELECT id, name, device_type, os,
+              (is_online = TRUE OR (tracker_last_ping_at IS NOT NULL AND tracker_last_ping_at >= NOW() - INTERVAL '3 minutes')) AS is_online,
+              last_seen, mac_address, created_at,
+              tracker_device_id, tracker_last_ping_at, tracker_battery_level
        FROM devices WHERE user_id = $1 ORDER BY name ASC`,
       [req.user.userId]
     );
@@ -95,7 +97,11 @@ router.get('/', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
   try {
     const { rows: [device] } = await query(
-      `SELECT * FROM devices WHERE id = $1 AND user_id = $2`,
+      `SELECT id, user_id, name, device_type, os,
+              (is_online = TRUE OR (tracker_last_ping_at IS NOT NULL AND tracker_last_ping_at >= NOW() - INTERVAL '3 minutes')) AS is_online,
+              last_seen, mac_address, device_token, created_at,
+              tracker_device_id, tracker_last_ping_at, tracker_battery_level
+       FROM devices WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.user.userId]
     );
     if (!device) return res.status(404).json({ error: 'Device not found' });
@@ -109,6 +115,24 @@ router.get('/:id', auth, async (req, res) => {
        LIMIT 60`,
       [req.params.id]
     );
+
+    // If Traccar has sent battery, ensure metrics reflect Traccar's battery
+    if (device.tracker_battery_level !== null && device.tracker_battery_level !== undefined) {
+      const traccarBat = Math.round(Number(device.tracker_battery_level));
+      if (metrics.length > 0) {
+        metrics[0].battery_percent = traccarBat;
+      } else {
+        metrics.push({
+          cpu_percent: null,
+          memory_used_mb: null,
+          memory_total_mb: null,
+          disk_used_gb: null,
+          disk_total_gb: null,
+          battery_percent: traccarBat,
+          recorded_at: device.tracker_last_ping_at || new Date().toISOString()
+        });
+      }
+    }
 
     res.json({ device, metrics: metrics.reverse() });
   } catch (err) {

@@ -153,6 +153,7 @@ async function getTrackerStatusForDevice(device) {
     tracker_device_id: device.tracker_device_id || device.id,
     is_connected: isConnected,
     last_ping_at: device.tracker_last_ping_at || latestLocation?.recorded_at || null,
+    tracker_battery_level: device.tracker_battery_level ?? latestLocation?.battery_level ?? null,
     latest_location: latestLocation,
   };
 }
@@ -196,9 +197,11 @@ async function receivePing(req, res) {
 
     const trackerKey = String(rawDeviceId).trim();
     const { rows: deviceRows } = await query(
-      `SELECT id, user_id, name, tracker_device_id
+      `SELECT id, user_id, name, tracker_device_id, tracker_battery_level
        FROM devices
-       WHERE tracker_device_id = $1 OR id::text = $1
+       WHERE LOWER(tracker_device_id) = LOWER($1)
+          OR id::text = $1
+          OR LOWER(REPLACE(COALESCE(tracker_device_id, ''), 'dms-', '')) = LOWER(REPLACE($1, 'dms-', ''))
        LIMIT 1`,
       [trackerKey]
     );
@@ -225,18 +228,29 @@ async function receivePing(req, res) {
       : null;
 
     let batteryLevel = null;
-    const rawBatt = pickInput(req, ['batt', 'battery']);
-    if (rawBatt !== undefined && Number.isFinite(Number(rawBatt))) {
+    const rawBatt = pickInput(req, ['batt', 'battery', 'bat']);
+    if (rawBatt !== undefined && rawBatt !== null && rawBatt !== '') {
       const b = Number(rawBatt);
-      batteryLevel = b >= 0 && b <= 1 ? Math.round(b * 1000) / 10 : b;
-    } else if (batteryObj.level !== undefined && Number.isFinite(Number(batteryObj.level)) && Number(batteryObj.level) >= 0) {
+      if (Number.isFinite(b)) {
+        if (b > 0 && b <= 1) {
+          batteryLevel = Math.round(b * 1000) / 10;
+        } else {
+          batteryLevel = Math.round(b * 10) / 10;
+        }
+      }
+    } else if (batteryObj.level !== undefined && Number.isFinite(Number(batteryObj.level))) {
       const b = Number(batteryObj.level);
-      batteryLevel = b <= 1 ? Math.round(b * 1000) / 10 : b;
+      batteryLevel = (b > 0 && b <= 1) ? Math.round(b * 1000) / 10 : Math.round(b * 10) / 10;
     }
 
     await query(
-      `UPDATE devices SET tracker_last_ping_at = NOW(), last_seen = NOW() WHERE id = $1`,
-      [device.id]
+      `UPDATE devices
+       SET is_online = TRUE,
+           tracker_last_ping_at = NOW(),
+           last_seen = NOW(),
+           tracker_battery_level = COALESCE($2, tracker_battery_level)
+       WHERE id = $1`,
+      [device.id, batteryLevel]
     );
 
     const { rows: insertedRows } = await query(
@@ -246,8 +260,18 @@ async function receivePing(req, res) {
       [device.id, latitude, longitude, accuracyMeters, batteryLevel, speed, recordedAt]
     );
 
+    if (batteryLevel !== null) {
+      const roundedBat = Math.round(batteryLevel);
+      await query(
+        `INSERT INTO metrics (device_id, battery_percent, recorded_at)
+         VALUES ($1, $2, $3)`,
+        [device.id, roundedBat, recordedAt]
+      );
+    }
+
     const io = req.app.get('io');
     if (io) {
+      io.emit('device:online', { deviceId: device.id, name: device.name });
       io.emit('location:update', {
         deviceId: device.id,
         latitude,
@@ -258,7 +282,22 @@ async function receivePing(req, res) {
         recorded_at: recordedAt.toISOString(),
         source: 'traccar',
       });
+      if (batteryLevel !== null) {
+        io.emit('metrics:update', {
+          deviceId: device.id,
+          cpu_percent: null,
+          memory_used_mb: null,
+          memory_total_mb: null,
+          disk_used_gb: null,
+          disk_total_gb: null,
+          battery_percent: Math.round(batteryLevel),
+          recorded_at: recordedAt.toISOString(),
+          source: 'traccar',
+        });
+      }
     }
+
+    console.log(`[Tracking] Ping OK for ${device.name} (${device.id}): lat=${latitude}, lon=${longitude}, batt=${batteryLevel ?? 'N/A'}%`);
 
     return res.json({
       ok: true,
