@@ -39,7 +39,7 @@ module.exports = (req, res, next) => {
     if (req.path.includes('/download/')) {
        console.warn(`[Auth Warning] No token provided for: ${req.originalUrl}`);
     }
-    return res.status(401).json({ error: 'DEBUG_TOKEN_MISSING_V4' });
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
   try {
@@ -49,6 +49,6 @@ module.exports = (req, res, next) => {
     if (req.path.includes('/download/')) {
        console.error(`[Auth Error] Token verification failed for ${req.originalUrl}:`, err.message);
     }
-    res.status(403).json({ error: 'Invalid or expired token' });
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 };

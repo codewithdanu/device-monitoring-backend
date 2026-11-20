@@ -17,7 +17,7 @@ pool.on('connect', () => console.log('[DB] New client connected to pool'));
 
 const query = (text, params) => pool.query(text, params);
 
-// Auto-migration for activities table
+// Auto-migration for activities & Traccar tracking columns
 (async () => {
   try {
     await query(`
@@ -30,8 +30,20 @@ const query = (text, params) => pool.query(text, params);
         recorded_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_activities_device_time ON activities (device_id, recorded_at DESC);
+
+      ALTER TABLE devices
+        ADD COLUMN IF NOT EXISTS tracker_device_id TEXT UNIQUE,
+        ADD COLUMN IF NOT EXISTS tracker_last_ping_at TIMESTAMPTZ;
+
+      UPDATE devices
+      SET tracker_device_id = 'DMS-' || UPPER(SUBSTRING(id::text FROM 1 FOR 8))
+      WHERE tracker_device_id IS NULL;
+
+      ALTER TABLE locations
+        ADD COLUMN IF NOT EXISTS battery_level REAL,
+        ADD COLUMN IF NOT EXISTS speed REAL;
     `);
-    console.log('[DB] Auto-migration complete for activities table');
+    console.log('[DB] Auto-migration complete for activities & Traccar tracking');
   } catch (err) {
     console.error('[DB] Auto-migration error:', err.message);
   }

@@ -81,7 +81,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '365d' }
     );
 
     res.json({ token, userId: user.id, username: user.username });
@@ -137,7 +137,7 @@ router.post('/login/2fa', authLimiter, async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '365d' }
     );
 
     res.json({ token, userId: user.id, username: user.username });
