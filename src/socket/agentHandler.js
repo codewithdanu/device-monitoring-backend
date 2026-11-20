@@ -223,12 +223,24 @@ module.exports = (io) => {
     socket.on('disconnect', async () => {
       if (socket.deviceId) {
         try {
-          await query(
-            `UPDATE devices SET is_online = FALSE WHERE id = $1`,
+          const socketRoom = io.sockets.adapter.rooms.get(`device:${socket.deviceId}`);
+          const remainingSockets = socketRoom ? socketRoom.size : 0;
+
+          const { rows: [dev] } = await query(
+            `SELECT tracker_last_ping_at FROM devices WHERE id = $1`,
             [socket.deviceId]
           );
-          io.emit('device:offline', { deviceId: socket.deviceId });
-          console.log(`[Socket] Device offline: ${socket.deviceId}`);
+          const hasRecentTraccar = dev?.tracker_last_ping_at &&
+            (Date.now() - new Date(dev.tracker_last_ping_at).getTime() < 180_000);
+
+          if (remainingSockets === 0 && !hasRecentTraccar) {
+            await query(
+              `UPDATE devices SET is_online = FALSE WHERE id = $1`,
+              [socket.deviceId]
+            );
+            io.emit('device:offline', { deviceId: socket.deviceId });
+            console.log(`[Socket] Device offline: ${socket.deviceId}`);
+          }
         } catch (err) {
           console.error('[Socket] Disconnect update error:', err.message);
         }

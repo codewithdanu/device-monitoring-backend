@@ -13,9 +13,14 @@ const compression = require('compression');
 const app        = express();
 app.set('trust proxy', 1);
 
-// Startup: Reset all devices to offline
+// Startup: Reset offline status for devices without recent activity
 const { query } = require('./db');
-query('UPDATE devices SET is_online = FALSE').catch(err => console.error('[Startup] DB reset failed:', err));
+const { startDeviceStatusSweeper } = require('./services/deviceStatusSweeper');
+query(
+  `UPDATE devices
+   SET is_online = FALSE
+   WHERE tracker_last_ping_at IS NULL OR tracker_last_ping_at < NOW() - INTERVAL '3 minutes'`
+).catch(err => console.error('[Startup] DB reset failed:', err));
 
 app.use(helmet({
   contentSecurityPolicy: false, // Required for Swagger and inline previews
@@ -109,6 +114,7 @@ app.use('/api/tracking', require('./routes/tracking'));
 
 app.set('io', io);
 require('./socket/agentHandler')(io);
+startDeviceStatusSweeper(io);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
