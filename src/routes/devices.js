@@ -23,11 +23,18 @@ router.post('/register', auth, async (req, res) => {
       [req.user.userId, name, device_type, os || null, mac_address || null]
     );
 
+    const trackerDeviceId = `DMS-${rows[0].id.substring(0, 8).toUpperCase()}`;
+    await query(
+      `UPDATE devices SET tracker_device_id = $1 WHERE id = $2 AND tracker_device_id IS NULL`,
+      [trackerDeviceId, rows[0].id]
+    );
+
     res.status(201).json({
-      deviceId:    rows[0].id,
-      deviceToken: rows[0].device_token,
-      name:        rows[0].name,
-      device_type: rows[0].device_type,
+      deviceId:         rows[0].id,
+      deviceToken:      rows[0].device_token,
+      trackerDeviceId,
+      name:             rows[0].name,
+      device_type:      rows[0].device_type,
     });
   } catch (err) {
     console.error('[Devices] Register error:', err.message);
@@ -72,7 +79,8 @@ router.post('/register', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT id, name, device_type, os, is_online, last_seen, mac_address, created_at
+      `SELECT id, name, device_type, os, is_online, last_seen, mac_address, created_at,
+              tracker_device_id, tracker_last_ping_at
        FROM devices WHERE user_id = $1 ORDER BY name ASC`,
       [req.user.userId]
     );
@@ -119,7 +127,7 @@ router.get('/:id/location', auth, async (req, res) => {
     if (!device) return res.status(403).json({ error: 'Forbidden' });
 
     const { rows } = await query(
-      `SELECT latitude, longitude, accuracy_meters, recorded_at
+      `SELECT latitude, longitude, accuracy_meters, battery_level, speed, recorded_at
        FROM locations WHERE device_id = $1 ORDER BY recorded_at DESC LIMIT 1`,
       [req.params.id]
     );

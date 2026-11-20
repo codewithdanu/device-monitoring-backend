@@ -11,6 +11,7 @@ const helmet     = require('helmet');
 const compression = require('compression');
 
 const app        = express();
+app.set('trust proxy', 1);
 
 // Startup: Reset all devices to offline
 const { query } = require('./db');
@@ -104,6 +105,7 @@ app.use('/api/devices',  require('./routes/devices'));
 app.use('/api/commands', require('./routes/commands'));
 app.use('/api/files',    require('./routes/files'));
 app.use('/api/metrics',  require('./routes/metrics'));
+app.use('/api/tracking', require('./routes/tracking'));
 
 app.set('io', io);
 require('./socket/agentHandler')(io);
